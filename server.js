@@ -30,7 +30,7 @@ function generateJs(botToken, chatId) {
         .replace('{{chatId}}', chatId);
 }
 
-// Serve static files
+// Serve static files (including dynamically generated files)
 app.use('/static', express.static(path.join(__dirname, 'public', 'templates')));
 
 // Endpoint to generate dynamic content
