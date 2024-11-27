@@ -37,6 +37,9 @@ app.use('/static', express.static(path.join(__dirname, 'public', 'templates')));
 app.get('/', (req, res) => {
     const { filename, size, chatId, botToken } = req.query;
 
+    // Debug log: check query parameters
+    console.log('Query Parameters:', { filename, size, chatId, botToken });
+
     // Check if required query parameters are provided
     if (!filename || !size || !chatId || !botToken) {
         return res.status(400).send('Missing query parameters: filename, size, chatId, or botToken.');
