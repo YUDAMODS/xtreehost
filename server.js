@@ -4,7 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
-const port = 0.0.0.0;
+const port = 3000;
 
 // Helper: Generate random folder name
 function generateRandomFolderName() {
